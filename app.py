@@ -1,13 +1,25 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session
 import requests
+from datetime import datetime
+import os
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'your-secret-key-here')  # Change this in production
 
 # Replace this with your actual API key from openrouter.ai
-API_KEY = "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"
+API_KEY = os.environ.get('OPENROUTER_API_KEY', 'your-api-key-here')
+
+# Make sure the static folder exists
+os.makedirs('static', exist_ok=True)
+
+@app.before_request
+def make_session_permanent():
+    session.permanent = True  # Make the session last for the browser session
 
 @app.route("/")
 def index():
+    if 'chat_history' not in session:
+        session['chat_history'] = []
     return render_template("index.html")
 
 @app.route("/get", methods=["POST"])
@@ -16,17 +28,30 @@ def chat():
     if not user_message:
         return jsonify({"error": "No message provided."}), 400
 
+    # Initialize chat history in session if it doesn't exist
+    if 'chat_history' not in session:
+        session['chat_history'] = []
+
+    # Prepare the conversation history for the API
+    messages = [
+        {"role": "system", "content": "You are a helpful assistant that gives sustainable purchasing advice, eco-friendly tips, and recycling guides."}
+    ]
+    
+    # Add previous conversation history (only the content, not the metadata)
+    for msg in session['chat_history']:
+        messages.append({"role": msg['role'], "content": msg['content']})
+    
+    # Add the new user message
+    messages.append({"role": "user", "content": user_message})
+
     headers = {
         "Authorization": f"Bearer {API_KEY}",
         "Content-Type": "application/json"
     }
 
     payload = {
-        "model": "openai/gpt-3.5-turbo",  # Changed to a valid model
-        "messages": [
-            {"role": "system", "content": "You are a helpful assistant that gives sustainable purchasing advice, eco-friendly tips, and recycling guides."},
-            {"role": "user", "content": user_message}
-        ]
+        "model": "openrouter/auto",  # Using auto to let OpenRouter choose the best model
+        "messages": messages
     }
 
     try:
@@ -34,29 +59,43 @@ def chat():
             "https://openrouter.ai/api/v1/chat/completions",
             headers=headers,
             json=payload,
-            timeout=30  # Add timeout to prevent hanging
+            timeout=30
         )
         
-        print("API Response Status:", response.status_code)
         response_data = response.json()
-        print("API Response Data:", response_data)
 
         if response.status_code == 200:
             if "choices" in response_data and len(response_data["choices"]) > 0:
                 bot_reply = response_data["choices"][0]["message"].get("content", "I'm sorry, I couldn't generate a response.")
+                
+                # Store both user message and bot reply in session
+                if len(session['chat_history']) >= 20:  # Limit history to last 10 exchanges (20 messages)
+                    session['chat_history'] = session['chat_history'][-18:]  # Keep last 9 exchanges plus new ones
+                
+                session['chat_history'].extend([
+                    {"role": "user", "content": user_message, "timestamp": datetime.now().isoformat()},
+                    {"role": "assistant", "content": bot_reply, "timestamp": datetime.now().isoformat()}
+                ])
+                session.modified = True  # Mark session as modified to save changes
+                
                 return jsonify({"reply": bot_reply})
             return jsonify({"error": "Invalid response format from AI service"}), 500
         
-        # Handle API error responses
-        error_msg = response_data.get("error", {}).get("message", "Unknown error occurred")
-        return jsonify({"error": f"AI Service Error: {error_msg}"}), 500
-    
-    except requests.exceptions.RequestException as e:
-        print("Request Exception:", str(e))
-        return jsonify({"error": f"Error connecting to AI service: {str(e)}"}), 500
+        return jsonify({"error": f"API error: {response_data.get('error', {}).get('message', 'Unknown error')}"}), response.status_code
+
     except Exception as e:
-        print("Unexpected Error:", str(e))
-        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/clear_history", methods=["POST"])
+def clear_history():
+    if 'chat_history' in session:
+        session['chat_history'] = []
+        session.modified = True
+    return jsonify({"status": "success"})
+
+# This is required for Vercel
+def handler(event, context):
+    return app(event, context)
 
 if __name__ == "__main__":
     app.run(debug=True)
