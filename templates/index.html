@@ -32,6 +32,11 @@
     const sendButton = document.getElementById('submit-btn');
     let isProcessing = false;
 
+    // Set the API URL based on the environment
+    const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? 'http://localhost:5000'  // Local development
+      : 'https://eco-chatbot-ai-agent.vercel.app';  // Production
+
     // Function to add a message to the chat
     function addMessage(role, content, isError = false) {
       const messageDiv = document.createElement('div');
@@ -67,11 +72,12 @@
         chatBox.scrollTop = chatBox.scrollHeight;
 
         // Send message to backend
-        const response = await fetch('/get', {
+        const response = await fetch(`${API_BASE_URL}/get`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
+          credentials: 'include',  // Important for CORS with credentials
           body: JSON.stringify({ message: message })
         });
 
