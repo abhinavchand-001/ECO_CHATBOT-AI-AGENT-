@@ -21,46 +21,62 @@
     </div>
 
     <form id="chat-form">
-      <input type="text" id="user-input" placeholder="Ask about recycling, eco products, etc." autocomplete="off" />
-      <button type="submit">Send</button>
+      <input type="text" id="user-input" placeholder="Ask about recycling, eco products, etc." autocomplete="off" disabled />
+      <button type="submit" id="submit-btn" disabled>Send</button>
     </form>
   </div>
 
   <script>
-    const form = document.getElementById('chat-form');
-    const input = document.getElementById('user-input');
     const chatBox = document.getElementById('chat-box');
+    const userInput = document.getElementById('user-input');
+    const sendButton = document.getElementById('submit-btn');
+    let isProcessing = false;
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const userInput = input.value.trim();
-      if (!userInput) return;
-
-      // Show user message
-      const userMessage = document.createElement('div');
-      userMessage.className = 'message';
-      userMessage.textContent = '🧑‍💬 ' + userInput;
-      chatBox.appendChild(userMessage);
-
-      // Scroll down
+    // Function to add a message to the chat
+    function addMessage(role, content, isError = false) {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${role}-message`;
+      if (isError) {
+        messageDiv.className += ' error-message';
+        messageDiv.textContent = '❌ ' + content;
+      } else {
+        const prefix = role === 'user' ? '👤 ' : '🤖 ';
+        messageDiv.textContent = prefix + content;
+      }
+      chatBox.appendChild(messageDiv);
       chatBox.scrollTop = chatBox.scrollHeight;
-      input.value = '';
+    }
 
-      // Show loading message
-      const loadingMessage = document.createElement('div');
-      loadingMessage.className = 'message';
-      loadingMessage.textContent = '🤖 Thinking...';
-      chatBox.appendChild(loadingMessage);
-      chatBox.scrollTop = chatBox.scrollHeight;
+    // Function to handle sending messages
+    async function sendMessage() {
+      const message = userInput.value.trim();
+      if (!message || isProcessing) return;
+
+      // Add user message to chat
+      addMessage('user', message);
+      userInput.value = '';
+      isProcessing = true;
+      sendButton.disabled = true;
 
       try {
+        // Show loading indicator
+        const loadingMessage = document.createElement('div');
+        loadingMessage.className = 'message bot-message';
+        loadingMessage.textContent = '⏳ Thinking...';
+        chatBox.appendChild(loadingMessage);
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        // Send message to backend
         const response = await fetch('/get', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ msg: userInput }),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ message: message })
         });
 
         console.log('Response status:', response.status);
+        
         const data = await response.json();
         console.log('Response data:', data);
         
@@ -68,44 +84,53 @@
           throw new Error(data.error || 'Failed to get response');
         }
 
+        // Remove loading message
         loadingMessage.remove();
 
-        const botMessage = document.createElement('div');
-        botMessage.className = 'message';
-        botMessage.textContent = '🤖 ' + (data.reply || 'I apologize, but I couldn\'t generate a response.');
-        chatBox.appendChild(botMessage);
-        chatBox.scrollTop = chatBox.scrollHeight;
+        // Add bot response to chat
+        if (data.response) {
+          addMessage('bot', data.response);
+        } else if (data.reply) {
+          // Handle different response format
+          addMessage('bot', data.reply);
+        } else {
+          throw new Error('No valid response from server');
+        }
 
       } catch (error) {
-        loadingMessage.remove();
-        
-        const errorMessage = document.createElement('div');
-        errorMessage.className = 'message error-message';
-        
-        // Try to parse the error if it's a JSON response
-        let errorText = '❌ Oops! Something went wrong.';
-        try {
-          const errorData = await error.response?.json();
-          if (errorData?.error) {
-            errorText = `❌ Error: ${errorData.error}`;
-            if (errorData.details) {
-              errorText += `\n${errorData.details}`;
-            }
-          } else if (error.message) {
-            errorText = `❌ ${error.message}`;
-          }
-        } catch (e) {
-          // If we can't parse the error, use the original error
-          errorText = `❌ ${error.message || 'An unknown error occurred'}`;
+        console.error('Chat error:', error);
+        const errorMessages = document.querySelectorAll('.message.bot-message:last-child');
+        const loadingMessage = errorMessages[errorMessages.length - 1];
+        if (loadingMessage && loadingMessage.textContent.includes('Thinking')) {
+          loadingMessage.remove();
         }
         
-        errorMessage.textContent = errorText;
-        chatBox.appendChild(errorMessage);
-        chatBox.scrollTop = chatBox.scrollHeight;
-        
-        // Log the full error to console for debugging
-        console.error('Chat error:', error);
+        let errorMessage = '❌ Oops! Something went wrong. ';
+        if (error.message.includes('Failed to fetch')) {
+          errorMessage += 'Please check your internet connection.';
+        } else if (error.message) {
+          errorMessage += error.message;
+        }
+        addMessage('bot', errorMessage, true);
+      } finally {
+        isProcessing = false;
+        sendButton.disabled = false;
+        userInput.focus();
       }
+    }
+
+    // Event listeners
+    sendButton.addEventListener('click', sendMessage);
+    userInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendMessage();
+      }
+    });
+
+    // Enable form after page loads
+    window.addEventListener('DOMContentLoaded', () => {
+      userInput.disabled = false;
+      sendButton.disabled = false;
     });
 
     // Dark mode toggle functionality
