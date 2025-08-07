@@ -4,10 +4,10 @@ from datetime import datetime
 import os
 
 app = Flask(__name__, static_folder='static')
-app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'your-secret-key-here')  # Change this in production
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', '466ddf3f39c04377a1ed73b7c9a7689d61637f74fb092623')  # Change this in production
 
 # Replace this with your actual API key from openrouter.ai
-API_KEY = os.environ.get('OPENROUTER_API_KEY', 'your-api-key-here')
+API_KEY = os.environ.get('OPENROUTER_API_KEY', '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')
 
 # Make sure the static folder exists
 os.makedirs('static', exist_ok=True)
