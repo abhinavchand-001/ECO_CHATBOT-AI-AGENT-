@@ -33,9 +33,8 @@
     let isProcessing = false;
 
     // Set the API URL based on the environment
-    const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-      ? 'http://localhost:5000'  // Local development
-      : 'https://eco-chatbot-ai-agent.vercel.app';  // Production
+    const API_BASE_URL = 'https://eco-chatbot-ai-agent.vercel.app';
+
 
     // Function to add a message to the chat
     function addMessage(role, content, isError = false) {
