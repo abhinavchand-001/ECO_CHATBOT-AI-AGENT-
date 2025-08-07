@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>EcoShop AI Assistant</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="chat-container">
+    <div class="header">
+      <h1>EcoShop AI Assistant</h1>
+      <label class="theme-switch">
+        <input type="checkbox" id="theme-toggle">
+        <span class="slider round"></span>
+      </label>
+    </div>
+    
+    <div class="chat-box" id="chat-box">
+      <div class="message">👋 Hello! I’m here to help you shop sustainably. Ask me anything!</div>
+    </div>
+
+    <form id="chat-form">
+      <input type="text" id="user-input" placeholder="Ask about recycling, eco products, etc." autocomplete="off" />
+      <button type="submit">Send</button>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('chat-form');
+    const input = document.getElementById('user-input');
+    const chatBox = document.getElementById('chat-box');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const userInput = input.value.trim();
+      if (!userInput) return;
+
+      // Show user message
+      const userMessage = document.createElement('div');
+      userMessage.className = 'message';
+      userMessage.textContent = '🧑‍💬 ' + userInput;
+      chatBox.appendChild(userMessage);
+
+      // Scroll down
+      chatBox.scrollTop = chatBox.scrollHeight;
+      input.value = '';
+
+      // Show loading message
+      const loadingMessage = document.createElement('div');
+      loadingMessage.className = 'message';
+      loadingMessage.textContent = '🤖 Thinking...';
+      chatBox.appendChild(loadingMessage);
+      chatBox.scrollTop = chatBox.scrollHeight;
+
+      try {
+        const response = await fetch('/get', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ msg: userInput }),
+        });
+
+        console.log('Response status:', response.status);
+        const data = await response.json();
+        console.log('Response data:', data);
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to get response');
+        }
+
+        loadingMessage.remove();
+
+        const botMessage = document.createElement('div');
+        botMessage.className = 'message';
+        botMessage.textContent = '🤖 ' + (data.reply || 'I apologize, but I couldn\'t generate a response.');
+        chatBox.appendChild(botMessage);
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+      } catch (error) {
+        loadingMessage.remove();
+        
+        const errorMessage = document.createElement('div');
+        errorMessage.className = 'message error-message';
+        
+        // Try to parse the error if it's a JSON response
+        let errorText = '❌ Oops! Something went wrong.';
+        try {
+          const errorData = await error.response?.json();
+          if (errorData?.error) {
+            errorText = `❌ Error: ${errorData.error}`;
+            if (errorData.details) {
+              errorText += `\n${errorData.details}`;
+            }
+          } else if (error.message) {
+            errorText = `❌ ${error.message}`;
+          }
+        } catch (e) {
+          // If we can't parse the error, use the original error
+          errorText = `❌ ${error.message || 'An unknown error occurred'}`;
+        }
+        
+        errorMessage.textContent = errorText;
+        chatBox.appendChild(errorMessage);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        
+        // Log the full error to console for debugging
+        console.error('Chat error:', error);
+      }
+    });
+
+    // Dark mode toggle functionality
+    const themeToggle = document.getElementById('theme-toggle');
+    
+    // Check for saved user preference, if any, on load
+    const currentTheme = localStorage.getItem('theme') || 'light';
+    if (currentTheme === 'dark') {
+      document.body.classList.add('dark-theme');
+      themeToggle.checked = true;
+    }
+    
+    // Listen for toggle changes
+    themeToggle.addEventListener('change', function() {
+      if (this.checked) {
+        document.body.classList.add('dark-theme');
+        localStorage.setItem('theme', 'dark');
+      } else {
+        document.body.classList.remove('dark-theme');
+        localStorage.setItem('theme', 'light');
+      }
+    });
+  </script>
+</body>
+</html>
