@@ -11,7 +11,7 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 headers = {
     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
     "Content-Type": "application/json",
-    "HTTP-Referer": "http://localhost:5000",  # Your website URL
+    "HTTP-Referer": "https://eco-chatbot-ai-agent.vercel.app",  # Your website URL
     "X-Title": "Eco Chatbot"  # Your app name
 }
 
