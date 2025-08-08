@@ -4,7 +4,7 @@ import requests
 app = Flask(__name__)
 
 # OpenRouter Configuration
-OPENROUTER_API_KEY = "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"
+OPENROUTER_API_KEY = "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"
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # Required headers for OpenRouter
